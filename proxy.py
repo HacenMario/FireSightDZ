@@ -2,14 +2,16 @@ import sys
 import urllib.request
 import urllib.parse
 import re
+import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Fix encoding for Windows
+# ضبط الترميز
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 class ProxyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        # استخراج الرابط المستهدف
         match = re.match(r'^/proxy/(.+)', self.path)
         if not match:
             self.send_response(400)
@@ -18,7 +20,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         target_url = urllib.parse.unquote(match.group(1))
-        print(f'[Proxy] Fetching: {target_url}')
+        print(f'[Proxy] Fetching: {target_url[:80]}...')
 
         try:
             req = urllib.request.Request(target_url, headers={
@@ -32,15 +34,20 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(content)
+                print(f'[Proxy] ✅ Success ({len(content)} bytes)')
         except Exception as e:
             self.send_response(500)
             self.end_headers()
             error_msg = f'Proxy error: {str(e)}'
             self.wfile.write(error_msg.encode())
-            print(f'[Proxy] Error: {error_msg}')
+            print(f'[Proxy] ❌ Error: {error_msg}')
+
+    def log_message(self, format, *args):
+        # تقليل السجلات المزعجة
+        pass
 
 if __name__ == '__main__':
-    server = HTTPServer(('localhost', 8080), ProxyHandler)
-    print('[Proxy] Server running on http://localhost:8080')
-    print('[Proxy] Use: http://localhost:8080/proxy/URL_ENCODE')
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    server = HTTPServer(('0.0.0.0', port), ProxyHandler)
+    print(f'[Proxy] Server running on port {port}')
     server.serve_forever()
