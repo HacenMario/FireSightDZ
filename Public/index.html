@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- ربط الـ manifest و service worker -->
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#ff6b35">
 
@@ -164,7 +163,6 @@
             transform: scale(0.97);
         }
 
-        /* زر الإشعارات */
         .notif-btn {
             background: #2a4055;
             border: none;
@@ -247,7 +245,7 @@
         }
 
         /* ============================================================
-           ALERT PANEL (مع خاصية التمرير اللانهائي)
+           ALERT PANEL
            ============================================================ */
         .alert-panel {
             position: absolute;
@@ -502,20 +500,21 @@
                 font-size: 11px;
             }
 
-            /* تحسين لوحة التنبيهات على الهواتف */
+            /* زيادة ارتفاع لوحة التنبيهات على الهواتف */
             .alert-panel {
-                width: 90%;
-                right: 5%;
+                width: 92%;
+                right: 4%;
                 bottom: 10px;
-                max-height: 280px;
-                padding: 12px;
+                max-height: 55vh; /* 55% من ارتفاع الشاشة */
+                min-height: 200px;
+                padding: 14px;
             }
             .alert-panel h3 {
                 font-size: 14px;
             }
             .alert-item {
                 font-size: 12px;
-                padding: 6px 10px;
+                padding: 8px 10px;
             }
             .status-bar {
                 font-size: 11px;
@@ -528,7 +527,7 @@
                 padding: 6px 12px;
                 bottom: 10px;
                 right: auto;
-                left: 5%;
+                left: 4%;
                 white-space: nowrap;
                 box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
             }
@@ -559,21 +558,28 @@
                 font-size: 18px;
             }
 
-            /* لوحة التنبيهات للشاشات الصغيرة جداً */
+            /* زيادة ارتفاع لوحة التنبيهات للشاشات الصغيرة جداً */
             .alert-panel {
-                width: 95%;
-                right: 2.5%;
+                width: 96%;
+                right: 2%;
                 bottom: 6px;
-                max-height: 200px;
+                max-height: 50vh; /* 50% من ارتفاع الشاشة */
+                min-height: 150px;
                 padding: 10px;
             }
 
-            /* زر التحكم للشاشات الصغيرة جداً */
             #toggleAlertBtn {
                 font-size: 11px;
                 padding: 5px 10px;
-                left: 2.5%;
+                left: 2%;
                 bottom: 6px;
+            }
+        }
+
+        /* للشاشات الكبيرة جداً */
+        @media (min-width: 1024px) {
+            .alert-panel {
+                max-height: 500px;
             }
         }
 
@@ -660,7 +666,6 @@
             <button class="refresh-btn" onclick="fetchWildfires()">⟳ تحديث</button>
             <span class="badge">🛰️ مباشر</span>
 
-            <!-- زر الإشعارات -->
             <button id="notifBtn" class="notif-btn" onclick="toggleNotifications()">
                 🔔 تفعيل الإشعارات
             </button>
@@ -1018,14 +1023,12 @@
         // 9. كشف الحرائق الجديدة وإرسال الإشعارات
         // ============================================================
         async function checkForNewFires(newFires) {
-            // لا نرسل إشعارات إذا لم يكن هناك اشتراك نشط
             if (!currentSubscription) {
                 console.log('ℹ️ لا يوجد اشتراك نشط، تخطي إرسال الإشعارات');
                 return;
             }
             if (newFires.length === 0) return;
 
-            // بناء مجموعة من النقاط السابقة للمقارنة
             const previousSet = new Set(previousFires.map(f =>
                 `${f.latitude.toFixed(4)},${f.longitude.toFixed(4)},${f.acq_date},${f.acq_time}`
             ));
@@ -1043,7 +1046,6 @@
 
             console.log(`🔥 تم اكتشاف ${newPoints.length} حريق جديد`);
 
-            // نأخذ أول 5 حرائق جديدة
             const limited = newPoints.slice(0, 5);
             for (const fire of limited) {
                 const location = await getLocationFromCoords(fire.latitude, fire.longitude);
@@ -1061,7 +1063,6 @@
                 });
             }
 
-            // تحديث القائمة السابقة
             previousFires = newFires.map(f => ({
                 latitude: f.latitude,
                 longitude: f.longitude,
@@ -1431,7 +1432,7 @@
         }
 
         // ============================================================
-        // 15. التحكم في إظهار/إخفاء لوحة التنبيهات (محسّن للهواتف)
+        // 15. التحكم في إظهار/إخفاء لوحة التنبيهات
         // ============================================================
         const alertPanel = document.getElementById('alertPanel');
         const toggleAlertBtn = document.getElementById('toggleAlertBtn');
@@ -1455,9 +1456,8 @@
         // 16. بدء التشغيل
         // ============================================================
 
-        const REFRESH_INTERVAL = 600000; // 10 دقائق
+        const REFRESH_INTERVAL = 600000;
 
-        // عند تحميل الصفحة
         document.addEventListener('DOMContentLoaded', async () => {
             if ('serviceWorker' in navigator) {
                 await checkSubscriptionStatus();
@@ -1468,7 +1468,6 @@
             }
         });
 
-        // تشغيل الجلب الأولي والتحديث الدوري
         fetchWildfires();
         setInterval(fetchWildfires, REFRESH_INTERVAL);
 
