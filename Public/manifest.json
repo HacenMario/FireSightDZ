@@ -1,0 +1,21 @@
+{
+  "name": "Wildfire Alert System",
+  "short_name": "Fire Alert",
+  "description": "Real-time wildfire detection with instant notifications",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1628",
+  "theme_color": "#ff6b35",
+  "icons": [
+    {
+      "src": "/fire-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/fire-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
