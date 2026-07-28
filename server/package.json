@@ -1,0 +1,15 @@
+{
+  "name": "wildfire-notifier-server",
+  "version": "1.0.0",
+  "description": "Notification server for wildfire alerts using VAPID",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "web-push": "^3.5.0"
+  }
+}
