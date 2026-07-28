@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚨by MADOUNINE Hacene - نظام الإنذار المبكر للحرائق في الجزائر</title>
+    <title>🚨 by MADOUNINE Hacene - نظام الإنذار المبكر للحرائق في الجزائر</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -265,7 +265,7 @@
             direction: rtl;
             display: flex;
             flex-direction: column;
-            transition: 0.3s;
+            transition: all 0.3s ease;
         }
         .alert-panel h3 {
             color: #ff6b35;
@@ -399,6 +399,37 @@
         }
 
         /* ============================================================
+           زر التحكم في إخفاء/إظهار التنبيهات
+           ============================================================ */
+        #toggleAlertBtn {
+            position: absolute;
+            bottom: 25px;
+            right: 385px;
+            background: #ff6b35;
+            border: none;
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        #toggleAlertBtn:hover {
+            transform: scale(1.05);
+        }
+        #toggleAlertBtn:active {
+            transform: scale(0.95);
+        }
+
+        /* ============================================================
            STATUS BAR
            ============================================================ */
         .status-bar {
@@ -427,7 +458,7 @@
         }
 
         /* ============================================================
-           RESPONSIVE
+           RESPONSIVE - تحسينات للهواتف
            ============================================================ */
         @media (max-width: 768px) {
             .header h1 {
@@ -470,6 +501,8 @@
             .stat-card .label {
                 font-size: 11px;
             }
+
+            /* تحسين لوحة التنبيهات على الهواتف */
             .alert-panel {
                 width: 90%;
                 right: 5%;
@@ -487,6 +520,17 @@
             .status-bar {
                 font-size: 11px;
                 padding: 4px 15px;
+            }
+
+            /* تحسين زر التحكم على الهواتف */
+            #toggleAlertBtn {
+                font-size: 12px;
+                padding: 6px 12px;
+                bottom: 10px;
+                right: auto;
+                left: 5%;
+                white-space: nowrap;
+                box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
             }
         }
 
@@ -514,12 +558,22 @@
             .stat-card .num {
                 font-size: 18px;
             }
+
+            /* لوحة التنبيهات للشاشات الصغيرة جداً */
             .alert-panel {
                 width: 95%;
                 right: 2.5%;
                 bottom: 6px;
                 max-height: 200px;
                 padding: 10px;
+            }
+
+            /* زر التحكم للشاشات الصغيرة جداً */
+            #toggleAlertBtn {
+                font-size: 11px;
+                padding: 5px 10px;
+                left: 2.5%;
+                bottom: 6px;
             }
         }
 
@@ -641,39 +695,15 @@
     ============================================================ -->
     <div id="map"></div>
 
-    <!-- زر التحكم في لوحة التنبيهات -->
-<button id="toggleAlertBtn" style="
-    position: absolute;
-    bottom: 25px;
-    right: 385px;
-    background: #ff6b35;
-    border: none;
-    color: #fff;
-    padding: 8px 14px;
-    border-radius: 30px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: 'Cairo', sans-serif;
-    font-size: 13px;
-    z-index: 1000;
-    transition: 0.3s;
-    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-">
-    🙈 إخفاء التنبيهات
-</button>
-
-<!-- ============================================================
-ALERT PANEL
-============================================================ -->
-<div class="alert-panel" id="alertPanel">
-    <!-- ... المحتوى كما هو ... -->
-</div>
+    <!-- ============================================================
+    زر التحكم في لوحة التنبيهات
+    ============================================================ -->
+    <button id="toggleAlertBtn">
+        🙈 إخفاء التنبيهات
+    </button>
 
     <!-- ============================================================
-    ALERT PANEL (مع خاصية التمرير اللانهائي)
+    ALERT PANEL
     ============================================================ -->
     <div class="alert-panel" id="alertPanel">
         <h3>🚨 آخر التنبيهات الفورية</h3>
@@ -1401,7 +1431,28 @@ ALERT PANEL
         }
 
         // ============================================================
-        // 15. بدء التشغيل
+        // 15. التحكم في إظهار/إخفاء لوحة التنبيهات (محسّن للهواتف)
+        // ============================================================
+        const alertPanel = document.getElementById('alertPanel');
+        const toggleAlertBtn = document.getElementById('toggleAlertBtn');
+        let isAlertVisible = true;
+
+        toggleAlertBtn.addEventListener('click', function() {
+            if (isAlertVisible) {
+                alertPanel.style.display = 'none';
+                this.innerHTML = '👀 إظهار التنبيهات';
+                this.style.background = '#2a4055';
+                isAlertVisible = false;
+            } else {
+                alertPanel.style.display = 'flex';
+                this.innerHTML = '🙈 إخفاء التنبيهات';
+                this.style.background = '#ff6b35';
+                isAlertVisible = true;
+            }
+        });
+
+        // ============================================================
+        // 16. بدء التشغيل
         // ============================================================
 
         const REFRESH_INTERVAL = 600000; // 10 دقائق
@@ -1422,46 +1473,10 @@ ALERT PANEL
         setInterval(fetchWildfires, REFRESH_INTERVAL);
 
         console.log('🚀 نظام الإنذار المبكر للحرائق - النسخة النهائية مع الإشعارات');
-        console.log('📡 يعمل عبر Proxy المحلي على المنفذ 8080');
+        console.log('📡 يعمل عبر Proxy على Render');
         console.log('📍 جلب أسماء المواقع عبر Nominatim مع إعادة محاولة تلقائية');
         console.log(`⏱️ التحديث التلقائي: ${REFRESH_INTERVAL / 60000} دقيقة`);
         console.log('🔔 اضغط على زر "تفعيل الإشعارات" لتلقي التنبيهات على هاتفك');
-
-// ============================================================
-// التحكم في إظهار/إخفاء لوحة التنبيهات
-// ============================================================
-const alertPanel = document.getElementById('alertPanel');
-const toggleAlertBtn = document.getElementById('toggleAlertBtn');
-let isAlertVisible = true;
-
-toggleAlertBtn.addEventListener('click', function() {
-    if (isAlertVisible) {
-        alertPanel.style.display = 'none';
-        this.innerHTML = '👀 إظهار التنبيهات';
-        this.style.background = '#2a4055';
-        this.style.right = '25px';
-        isAlertVisible = false;
-    } else {
-        alertPanel.style.display = 'flex';
-        this.innerHTML = '🙈 إخفاء التنبيهات';
-        this.style.background = '#ff6b35';
-        this.style.right = window.innerWidth <= 768 ? 'calc(90% + 15px)' : '385px';
-        isAlertVisible = true;
-    }
-});
-
-function adjustToggleButtonPosition() {
-    const isMobile = window.innerWidth <= 768;
-    if (isAlertVisible) {
-        toggleAlertBtn.style.right = isMobile ? 'calc(90% + 15px)' : '385px';
-    } else {
-        toggleAlertBtn.style.right = isMobile ? '15px' : '25px';
-    }
-}
-
-window.addEventListener('load', adjustToggleButtonPosition);
-window.addEventListener('resize', adjustToggleButtonPosition);
-
     </script>
 
 </body>
