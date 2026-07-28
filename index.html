@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 نظام الإنذار المبكر للحرائق - الجزائر</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- ربط الـ manifest و service worker -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ff6b35">
+
+    <style>
+        /* ============================================================
+           RESET & BASE
+           ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: #0a1628;
+            color: #e8edf5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ============================================================
+           HEADER
+           ============================================================ */
+        .header {
+            background: linear-gradient(135deg, #0f1f33, #162a44);
+            padding: 10px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #ff6b35;
+            flex-wrap: wrap;
+            gap: 10px;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #ff6b35;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header h1 span {
+            color: #e8edf5;
+            font-weight: 400;
+            font-size: 16px;
+        }
+        .header .badge {
+            background: #ff6b35;
+            padding: 4px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            animation: pulse 2s infinite;
+            display: inline-block;
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* ============================================================
+           CONTROLS
+           ============================================================ */
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .controls label {
+            color: #b0cce0;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .controls select,
+        .controls input {
+            padding: 5px 12px;
+            border-radius: 8px;
+            border: 1px solid #2a4055;
+            background: #1a2f44;
+            color: #e8edf5;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px;
+            outline: none;
+            transition: 0.3s;
+        }
+        .controls select:focus,
+        .controls input:focus {
+            border-color: #ff6b35;
+            box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+        }
+        .controls input[type="number"] {
+            width: 55px;
+        }
+        .format-group {
+            display: flex;
+            gap: 4px;
+            background: #0f1f33;
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid #2a4055;
+        }
+        .format-group button {
+            background: transparent;
+            border: none;
+            color: #8aaec9;
+            padding: 4px 14px;
+            border-radius: 6px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: 600;
+        }
+        .format-group button.active {
+            background: #ff6b35;
+            color: #fff;
+        }
+        .format-group button:hover:not(.active) {
+            background: #1a2f44;
+            color: #e8edf5;
+        }
+        .refresh-btn {
+            background: #ff6b35;
+            border: none;
+            color: #fff;
+            padding: 6px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+        .refresh-btn:hover {
+            background: #ff8a5c;
+            transform: scale(1.03);
+        }
+        .refresh-btn:active {
+            transform: scale(0.97);
+        }
+
+        /* زر الإشعارات */
+        .notif-btn {
+            background: #2a4055;
+            border: none;
+            color: #e8edf5;
+            padding: 6px 18px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px;
+            transition: 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .notif-btn.active {
+            background: #ff6b35;
+            color: #fff;
+        }
+        .notif-btn:hover {
+            transform: scale(1.03);
+        }
+        .notif-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .notif-status {
+            font-size: 12px;
+            color: #8aaec9;
+            margin-right: 8px;
+        }
+
+        /* ============================================================
+           STATS
+           ============================================================ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            padding: 10px 25px;
+            background: #0e1c30;
+            border-bottom: 1px solid #1a2f44;
+            flex-shrink: 0;
+        }
+        .stat-card {
+            background: #15273e;
+            padding: 8px 14px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #ff6b35;
+        }
+        .stat-card .num {
+            font-size: 26px;
+            font-weight: 700;
+            color: #ff9f5b;
+        }
+        .stat-card .label {
+            font-size: 12px;
+            color: #8aaec9;
+        }
+        .stat-card.high {
+            border-left-color: #ff3333;
+        }
+        .stat-card.nominal {
+            border-left-color: #ffaa33;
+        }
+        .stat-card.temp {
+            border-left-color: #4fc3f7;
+        }
+
+        /* ============================================================
+           MAP
+           ============================================================ */
+        #map {
+            flex: 1;
+            width: 100%;
+            min-height: 300px;
+            z-index: 1;
+            background: #0a1628;
+        }
+
+        /* ============================================================
+           ALERT PANEL (مع خاصية التمرير اللانهائي)
+           ============================================================ */
+        .alert-panel {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            width: 350px;
+            max-height: 400px;
+            background: rgba(10, 22, 40, 0.92);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(255, 107, 53, 0.25);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+            z-index: 999;
+            direction: rtl;
+            display: flex;
+            flex-direction: column;
+            transition: 0.3s;
+        }
+        .alert-panel h3 {
+            color: #ff6b35;
+            font-size: 16px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #1a2f44;
+            padding-bottom: 8px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert-scroll-container {
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 4px;
+            scroll-behavior: smooth;
+        }
+        .alert-scroll-container::-webkit-scrollbar {
+            width: 4px;
+        }
+        .alert-scroll-container::-webkit-scrollbar-thumb {
+            background: #ff6b35;
+            border-radius: 10px;
+        }
+        .alert-scroll-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .alert-item {
+            background: #15273e;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            border-right: 4px solid #ffaa33;
+            font-size: 13px;
+            color: #d0dce8;
+            transition: 0.2s;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .alert-item:hover {
+            background: #1a2f44;
+        }
+        .alert-item.high {
+            border-right-color: #ff3333;
+        }
+        .alert-item.nominal {
+            border-right-color: #ffaa33;
+        }
+        .alert-item.low {
+            border-right-color: #ffdd55;
+        }
+        .alert-item strong {
+            color: #ff9f5b;
+        }
+        .alert-item small {
+            color: #8aaec9;
+            display: block;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        .alert-item .gmaps-link {
+            color: #4fc3f7;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .alert-item .gmaps-link:hover {
+            text-decoration: underline;
+        }
+        .alert-loading {
+            color: #8aaec9;
+            text-align: center;
+            padding: 20px 0;
+        }
+        .alert-empty {
+            color: #66dd88;
+            text-align: center;
+            padding: 20px 0;
+        }
+        .alert-error {
+            color: #ff5555;
+            padding: 12px;
+            background: #1a0f0f;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+        .alert-error small {
+            color: #8aaec9;
+            display: block;
+            margin-top: 4px;
+        }
+        .load-more-btn {
+            background: #1a2f44;
+            border: 1px solid #2a4055;
+            color: #b0cce0;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 6px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .load-more-btn:hover {
+            background: #2a4055;
+            color: #e8edf5;
+            border-color: #ff6b35;
+        }
+        .load-more-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .alert-counter {
+            color: #8aaec9;
+            font-size: 12px;
+            text-align: center;
+            padding: 4px 0;
+            flex-shrink: 0;
+        }
+
+        /* ============================================================
+           STATUS BAR
+           ============================================================ */
+        .status-bar {
+            background: #0e1c30;
+            padding: 6px 25px;
+            border-top: 1px solid #1a2f44;
+            font-size: 12px;
+            color: #8aaec9;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .status-bar .info {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-bar .count {
+            color: #ff9f5b;
+            font-weight: 700;
+        }
+        .status-bar .highlight {
+            color: #ff6b35;
+        }
+
+        /* ============================================================
+           RESPONSIVE
+           ============================================================ */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 18px;
+            }
+            .header h1 span {
+                font-size: 14px;
+            }
+            .controls {
+                gap: 6px;
+            }
+            .controls label {
+                font-size: 12px;
+            }
+            .controls select,
+            .controls input {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+            .format-group button {
+                font-size: 12px;
+                padding: 3px 10px;
+            }
+            .refresh-btn {
+                font-size: 12px;
+                padding: 4px 14px;
+            }
+            .notif-btn {
+                font-size: 12px;
+                padding: 4px 12px;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                padding: 8px 15px;
+                gap: 6px;
+            }
+            .stat-card .num {
+                font-size: 20px;
+            }
+            .stat-card .label {
+                font-size: 11px;
+            }
+            .alert-panel {
+                width: 90%;
+                right: 5%;
+                bottom: 10px;
+                max-height: 280px;
+                padding: 12px;
+            }
+            .alert-panel h3 {
+                font-size: 14px;
+            }
+            .alert-item {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+            .status-bar {
+                font-size: 11px;
+                padding: 4px 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 6px;
+                padding: 8px 12px;
+            }
+            .header h1 {
+                font-size: 16px;
+                justify-content: center;
+            }
+            .controls {
+                justify-content: center;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                padding: 6px 10px;
+            }
+            .stat-card {
+                padding: 4px 8px;
+            }
+            .stat-card .num {
+                font-size: 18px;
+            }
+            .alert-panel {
+                width: 95%;
+                right: 2.5%;
+                bottom: 6px;
+                max-height: 200px;
+                padding: 10px;
+            }
+        }
+
+        /* ============================================================
+           UTILITY
+           ============================================================ */
+        .loading-text {
+            color: #ffaa33;
+            font-style: italic;
+        }
+        .gmaps-link {
+            color: #4fc3f7;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .gmaps-link:hover {
+            text-decoration: underline;
+        }
+        .error-msg {
+            color: #ff5555;
+            padding: 10px;
+            background: #1a0f0f;
+            border-radius: 10px;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        .error-msg small {
+            color: #8aaec9;
+            display: block;
+            margin-top: 4px;
+        }
+        .popup-content {
+            direction: rtl;
+            font-family: 'Cairo', sans-serif;
+            font-size: 14px;
+        }
+        .popup-content .fire-title {
+            color: #ff6b35;
+            font-weight: 700;
+        }
+        .popup-content .coords {
+            color: #b0cce0;
+        }
+        .popup-content .location {
+            color: #4fc3f7;
+        }
+        .popup-content .time {
+            color: #8aaec9;
+        }
+        .popup-content .temp {
+            color: #ff9f5b;
+        }
+        .popup-content .conf {
+            font-weight: 600;
+        }
+        .popup-content .frp {
+            color: #ffaa33;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================================
+    HEADER
+    ============================================================ -->
+    <header class="header">
+        <h1>🔥 <span>نظام الإنذار المبكر للحرائق</span> 🇩🇿</h1>
+        <div class="controls">
+            <label>
+                المصدر
+                <select id="sourceSelect">
+                    <option value="VIIRS_SNPP_NRT">VIIRS (3 أيام)</option>
+                    <option value="MODIS_NRT">MODIS (7 أيام)</option>
+                </select>
+            </label>
+            <label>
+                الأيام
+                <input type="number" id="daysInput" value="3" min="1" max="7">
+            </label>
+            <div class="format-group">
+                <button id="fmtCsv" class="active" onclick="setFormat('csv')">CSV</button>
+                <button id="fmtJson" onclick="setFormat('json')">JSON</button>
+            </div>
+            <button class="refresh-btn" onclick="fetchWildfires()">⟳ تحديث</button>
+            <span class="badge">🛰️ مباشر</span>
+
+            <!-- زر الإشعارات -->
+            <button id="notifBtn" class="notif-btn" onclick="toggleNotifications()">
+                🔔 تفعيل الإشعارات
+            </button>
+            <span id="notifStatus" class="notif-status"></span>
+        </div>
+    </header>
+
+    <!-- ============================================================
+    STATS
+    ============================================================ -->
+    <div class="stats-grid" id="statsContainer">
+        <div class="stat-card">
+            <div class="num" id="totalFires">0</div>
+            <div class="label">إجمالي النقاط</div>
+        </div>
+        <div class="stat-card high">
+            <div class="num" id="highFires">0</div>
+            <div class="label">خطورة عالية</div>
+        </div>
+        <div class="stat-card nominal">
+            <div class="num" id="nominalFires">0</div>
+            <div class="label">خطورة متوسطة</div>
+        </div>
+        <div class="stat-card temp">
+            <div class="num" id="avgTemp">0°</div>
+            <div class="label">متوسط الحرارة</div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+    MAP
+    ============================================================ -->
+    <div id="map"></div>
+
+    <!-- ============================================================
+    ALERT PANEL (مع خاصية التمرير اللانهائي)
+    ============================================================ -->
+    <div class="alert-panel" id="alertPanel">
+        <h3>🚨 آخر التنبيهات الفورية</h3>
+        <div class="alert-scroll-container" id="alertScrollContainer">
+            <div id="alertList">
+                <div class="alert-loading">⏳ جاري تحميل البيانات...</div>
+            </div>
+        </div>
+        <div class="alert-counter" id="alertCounter"></div>
+        <button class="load-more-btn" id="loadMoreBtn" style="display:none;" onclick="loadMoreAlerts()">
+            📥 تحميل المزيد
+        </button>
+    </div>
+
+    <!-- ============================================================
+    STATUS BAR
+    ============================================================ -->
+    <div class="status-bar" id="statusBar">
+        <span class="info">📡 المصدر: <span id="sourceDisplay">VIIRS_SNPP_NRT</span></span>
+        <span class="info">📅 الأيام: <span id="daysDisplay">3</span></span>
+        <span class="info">📍 النقاط: <span class="count" id="pointCount">0</span></span>
+        <span class="info">🕒 آخر تحديث: <span id="lastUpdate">--</span></span>
+        <span class="info">📄 الصيغة: <span id="formatDisplay">CSV</span></span>
+    </div>
+
+    <!-- ============================================================
+    SCRIPT
+    ============================================================ -->
+    <script>
+        // ============================================================
+        // 1. إعدادات الخريطة
+        // ============================================================
+        const map = L.map('map', {
+            center: [28.0, 2.0],
+            zoom: 5,
+            zoomControl: true,
+            fadeAnimation: true,
+        });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+        const fireLayer = L.layerGroup().addTo(map);
+
+        // ============================================================
+        // 2. إعدادات API
+        // ============================================================
+        const API_KEY = '8bc618cc45118958a1c423c09988f0de';
+        const ALGERIA_BBOX = '-8,19,12,37';
+        const PROXY_URL = 'http://localhost:8080/proxy/';
+        const MAX_POINTS = 500;
+        let currentFormat = 'csv';
+        const PAGE_SIZE = 5;
+
+        // ============================================================
+        // 3. متغيرات التحميل التدريجي والإشعارات
+        // ============================================================
+        let allAlertsData = [];
+        let currentPage = 0;
+        let isLoadingMore = false;
+        let previousFires = [];
+
+        // ============================================================
+        // 4. Cache و مؤقت الطلبات
+        // ============================================================
+        const locationCache = new Map();
+        let lastRequestTime = 0;
+
+        // ============================================================
+        // 5. دالة جلب اسم الموقع (مع إعادة محاولة)
+        // ============================================================
+        async function getLocationFromCoords(lat, lng, retries = 2) {
+            const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+            if (locationCache.has(key)) return locationCache.get(key);
+
+            const now = Date.now();
+            const timeSinceLast = now - lastRequestTime;
+            if (timeSinceLast < 2000) {
+                await new Promise(r => setTimeout(r, 2000 - timeSinceLast));
+            }
+            lastRequestTime = Date.now();
+
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    const url =
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=ar`;
+                    const proxyUrl = PROXY_URL + encodeURIComponent(url);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                    const response = await fetch(proxyUrl, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const data = await response.json();
+                    let locationName = '';
+                    if (data && data.address) {
+                        const addr = data.address;
+                        const city = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || '';
+                        const state = addr.state || addr.region || addr.county || '';
+                        const country = addr.country || '';
+                        locationName += city || 'منطقة غير محددة';
+                        if (state) locationName += ` (${state})`;
+                        else if (country) locationName += ` (${country})`;
+                    } else {
+                        locationName = `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+                    }
+                    const result = `📍 ${locationName}`;
+                    locationCache.set(key, result);
+                    return result;
+                } catch (error) {
+                    console.warn(`محاولة ${attempt + 1} فشلت:`, error.message);
+                    if (attempt === retries) {
+                        const fallback = `📍 ${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+                        locationCache.set(key, fallback);
+                        return fallback;
+                    }
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            }
+            return `📍 ${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+        }
+
+        // ============================================================
+        // 6. دوال مساعدة
+        // ============================================================
+        function getTimeAgo(dateStr, timeStr) {
+            if (!dateStr || !timeStr) return 'توقيت غير معروف';
+            try {
+                const h = parseInt(timeStr.substring(0, 2));
+                const m = parseInt(timeStr.substring(2, 4));
+                const fireDate = new Date(dateStr + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') +
+                    ':00Z');
+                fireDate.setHours(fireDate.getHours() + 1);
+                const now = new Date();
+                const diffMin = Math.floor((now - fireDate) / 60000);
+                if (diffMin < 1) return 'الآن';
+                if (diffMin < 60) return `قبل ${diffMin} دقيقة`;
+                const hours = Math.floor(diffMin / 60);
+                const mins = diffMin % 60;
+                if (hours < 24) return `قبل ${hours} ساعة و ${mins} دقيقة`;
+                const days = Math.floor(hours / 24);
+                return `قبل ${days} يوم`;
+            } catch (e) { return 'توقيت غير معروف'; }
+        }
+
+        function kelvinToCelsius(k) { return (k - 273.15).toFixed(1); }
+
+        function formatConfidence(conf) {
+            const c = (conf || '').toLowerCase();
+            if (c === 'high' || c === 'h') return '🔴 عالية';
+            if (c === 'nominal' || c === 'n') return '🟠 متوسطة';
+            if (c === 'low' || c === 'l') return '🟡 منخفضة';
+            return '⚪ غير محددة';
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length < 2) return [];
+            const headers = lines[0].split(',').map(h => h.trim());
+            const result = [];
+            for (let i = 1; i < lines.length; i++) {
+                const vals = lines[i].split(',').map(v => v.trim());
+                if (vals.length !== headers.length) continue;
+                const obj = {};
+                headers.forEach((h, idx) => { obj[h] = vals[idx]; });
+                result.push(obj);
+            }
+            return result;
+        }
+
+        function parseJSON(text) {
+            try {
+                const data = JSON.parse(text);
+                return Array.isArray(data) ? data : [];
+            } catch (e) { return []; }
+        }
+
+        // ============================================================
+        // 7. تبديل الصيغة
+        // ============================================================
+        function setFormat(format) {
+            currentFormat = format;
+            document.getElementById('fmtCsv').classList.toggle('active', format === 'csv');
+            document.getElementById('fmtJson').classList.toggle('active', format === 'json');
+            document.getElementById('formatDisplay').textContent = format.toUpperCase();
+            fetchWildfires();
+        }
+
+        // ============================================================
+        // 8. الدالة الرئيسية لجلب البيانات (مع إشعارات)
+        // ============================================================
+        async function fetchWildfires() {
+            const btn = document.querySelector('.refresh-btn');
+            const origText = btn.textContent;
+            btn.textContent = '⏳ جاري...';
+            document.getElementById('alertList').innerHTML = '<div class="alert-loading">⏳ جلب البيانات...</div>';
+            document.getElementById('pointCount').textContent = '⏳';
+            document.getElementById('loadMoreBtn').style.display = 'none';
+            document.getElementById('alertCounter').textContent = '';
+
+            const source = document.getElementById('sourceSelect').value;
+            let days = parseInt(document.getElementById('daysInput').value) || 3;
+            const maxDays = source === 'VIIRS_SNPP_NRT' ? 3 : 7;
+            if (days > maxDays) { days = maxDays;
+                document.getElementById('daysInput').value = days; }
+            if (days < 1) days = 1;
+
+            document.getElementById('sourceDisplay').textContent = source;
+            document.getElementById('daysDisplay').textContent = days;
+
+            const ext = currentFormat === 'csv' ? 'csv' : 'json';
+
+            try {
+                const url =
+                    `https://firms.modaps.eosdis.nasa.gov/api/area/${ext}/${API_KEY}/${source}/${ALGERIA_BBOX}/${days}`;
+                const proxyUrl = PROXY_URL + encodeURIComponent(url);
+                console.log(`🔄 محاولة ${ext}: ${proxyUrl}`);
+
+                const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(30000) });
+
+                if (!response.ok) throw new Error(`الخادم رد بحالة ${response.status}`);
+
+                const text = await response.text();
+                let rawData = currentFormat === 'csv' ? parseCSV(text) : parseJSON(text);
+
+                if (!rawData || rawData.length === 0) {
+                    document.getElementById('alertList').innerHTML = '<div class="alert-empty">✅ لا توجد حرائق نشطة.</div>';
+                    updateStats([]);
+                    fireLayer.clearLayers();
+                    document.getElementById('pointCount').textContent = '0';
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('ar-EG');
+                    previousFires = [];
+                    return;
+                }
+
+                console.log(`✅ نجح ${ext} مع ${rawData.length} نقطة`);
+
+                let formattedData = rawData.map(row => ({
+                    latitude: parseFloat(row.latitude),
+                    longitude: parseFloat(row.longitude),
+                    brightness: parseFloat(row.bright_ti4 || row.brightness || 0),
+                    confidence: row.confidence || 'unknown',
+                    frp: parseFloat(row.frp || 0),
+                    acq_date: row.acq_date || '',
+                    acq_time: row.acq_time || '',
+                    bright_ti4: parseFloat(row.bright_ti4 || 0)
+                })).filter(f => !isNaN(f.latitude) && !isNaN(f.longitude));
+
+                if (formattedData.length > MAX_POINTS) {
+                    formattedData.sort((a, b) => {
+                        const da = new Date(a.acq_date + 'T' + String(a.acq_time || '0000').padStart(4, '0'));
+                        const db = new Date(b.acq_date + 'T' + String(b.acq_time || '0000').padStart(4, '0'));
+                        return db - da;
+                    });
+                    formattedData = formattedData.slice(0, MAX_POINTS);
+                    console.log(`📊 تقليص إلى ${formattedData.length} (أحدث النقاط)`);
+                }
+
+                if (formattedData.length === 0) {
+                    document.getElementById('alertList').innerHTML = '<div class="alert-error">⚠️ لا توجد بيانات صالحة.</div>';
+                    updateStats([]);
+                    fireLayer.clearLayers();
+                    document.getElementById('pointCount').textContent = '0';
+                    previousFires = [];
+                    return;
+                }
+
+                // 🔥 كشف الحرائق الجديدة وإرسال الإشعارات
+                await checkForNewFires(formattedData);
+
+                updateMap(formattedData);
+                updateStats(formattedData);
+
+                allAlertsData = [...formattedData].sort((a, b) => {
+                    const order = { 'high': 3, 'nominal': 2, 'low': 1, 'h': 3, 'n': 2, 'l': 1 };
+                    const aScore = order[(a.confidence || '').toLowerCase()] || 0;
+                    const bScore = order[(b.confidence || '').toLowerCase()] || 0;
+                    if (bScore !== aScore) return bScore - aScore;
+                    const da = new Date(a.acq_date + 'T' + String(a.acq_time || '0000').padStart(4, '0'));
+                    const db = new Date(b.acq_date + 'T' + String(b.acq_time || '0000').padStart(4, '0'));
+                    return db - da;
+                });
+
+                currentPage = 0;
+                document.getElementById('alertList').innerHTML = '';
+                await renderAlertsPage();
+
+                document.getElementById('pointCount').textContent = formattedData.length;
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('ar-EG');
+                updateLoadMoreButton();
+
+            } catch (error) {
+                console.error('❌ فشل:', error);
+                document.getElementById('alertList').innerHTML = `
+                            <div class="alert-error">
+                                ⚠️ ${error.message}<br>
+                                <small>تأكد من تشغيل proxy.py على المنفذ 8080.</small>
+                            </div>
+                        `;
+                updateStats([]);
+                fireLayer.clearLayers();
+                document.getElementById('pointCount').textContent = '❌';
+                document.getElementById('loadMoreBtn').style.display = 'none';
+            } finally {
+                btn.textContent = origText;
+            }
+        }
+
+        // ============================================================
+        // 9. كشف الحرائق الجديدة وإرسال الإشعارات
+        // ============================================================
+        async function checkForNewFires(newFires) {
+            // لا نرسل إشعارات إذا لم يكن هناك اشتراك نشط
+            if (!currentSubscription) {
+                console.log('ℹ️ لا يوجد اشتراك نشط، تخطي إرسال الإشعارات');
+                return;
+            }
+            if (newFires.length === 0) return;
+
+            // بناء مجموعة من النقاط السابقة للمقارنة
+            const previousSet = new Set(previousFires.map(f =>
+                `${f.latitude.toFixed(4)},${f.longitude.toFixed(4)},${f.acq_date},${f.acq_time}`
+            ));
+
+            const newPoints = newFires.filter(f => {
+                const key =
+                    `${f.latitude.toFixed(4)},${f.longitude.toFixed(4)},${f.acq_date},${f.acq_time}`;
+                return !previousSet.has(key);
+            });
+
+            if (newPoints.length === 0) {
+                console.log('ℹ️ لا توجد حرائق جديدة');
+                return;
+            }
+
+            console.log(`🔥 تم اكتشاف ${newPoints.length} حريق جديد`);
+
+            // نأخذ أول 5 حرائق جديدة
+            const limited = newPoints.slice(0, 5);
+            for (const fire of limited) {
+                const location = await getLocationFromCoords(fire.latitude, fire.longitude);
+                const tempC = kelvinToCelsius(fire.brightness || fire.bright_ti4 || 0);
+                const timeAgo = getTimeAgo(fire.acq_date, fire.acq_time);
+                const confDisplay = formatConfidence(fire.confidence);
+
+                await sendFireNotificationToServer({
+                    location: location.replace('📍 ', ''),
+                    temperature: tempC,
+                    confidence: confDisplay,
+                    timeAgo: timeAgo,
+                    lat: fire.latitude,
+                    lng: fire.longitude,
+                });
+            }
+
+            // تحديث القائمة السابقة
+            previousFires = newFires.map(f => ({
+                latitude: f.latitude,
+                longitude: f.longitude,
+                acq_date: f.acq_date,
+                acq_time: f.acq_time,
+            }));
+        }
+
+        // ============================================================
+        // 10. إرسال إشعار حريق إلى الخادم
+        // ============================================================
+        async function sendFireNotificationToServer(fireData) {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/send-fire-notification`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(fireData),
+                });
+                const result = await response.json();
+                console.log('📨 إشعار حريق أُرسل:', result);
+            } catch (error) {
+                console.error('❌ فشل إرسال إشعار الحريق:', error);
+            }
+        }
+
+        // ============================================================
+        // 11. عرض دفعة التنبيهات (التحميل التدريجي)
+        // ============================================================
+        async function renderAlertsPage() {
+            if (isLoadingMore) return;
+            isLoadingMore = true;
+
+            const start = currentPage * PAGE_SIZE;
+            const end = Math.min(start + PAGE_SIZE, allAlertsData.length);
+            const pageData = allAlertsData.slice(start, end);
+
+            if (pageData.length === 0) {
+                isLoadingMore = false;
+                return;
+            }
+
+            const alertList = document.getElementById('alertList');
+            let html = '';
+
+            for (let i = 0; i < pageData.length; i++) {
+                const fire = pageData[i];
+                const location = await getLocationFromCoords(fire.latitude, fire.longitude);
+                const gmapsUrl = `https://www.google.com/maps?q=${fire.latitude},${fire.longitude}`;
+                const timeAgo = getTimeAgo(fire.acq_date, fire.acq_time);
+                const tempC = kelvinToCelsius(fire.brightness || fire.bright_ti4 || 0);
+                const confDisplay = formatConfidence(fire.confidence);
+
+                let className = 'low';
+                const conf = (fire.confidence || '').toLowerCase();
+                if (conf === 'high' || conf === 'h') className = 'high';
+                else if (conf === 'nominal' || conf === 'n') className = 'nominal';
+
+                const index = start + i + 1;
+                html += `
+                            <div class="alert-item ${className}">
+                                <strong>🔥 تنبيه #${index}</strong> - ${confDisplay}
+                                <small>${location}</small>
+                                <small><a href="${gmapsUrl}" target="_blank" class="gmaps-link">📍 فتح في Google Maps</a></small>
+                                <small>🕒 ${timeAgo}</small>
+                                <small>🌡️ ${tempC}°C</small>
+                            </div>
+                        `;
+            }
+
+            if (currentPage === 0) {
+                alertList.innerHTML = html;
+            } else {
+                alertList.insertAdjacentHTML('beforeend', html);
+            }
+
+            currentPage++;
+            isLoadingMore = false;
+
+            const displayed = Math.min(currentPage * PAGE_SIZE, allAlertsData.length);
+            document.getElementById('alertCounter').textContent = `عرض ${displayed} من ${allAlertsData.length} تنبيه`;
+            updateLoadMoreButton();
+        }
+
+        // ============================================================
+        // 12. تحديث زر "تحميل المزيد"
+        // ============================================================
+        function updateLoadMoreButton() {
+            const btn = document.getElementById('loadMoreBtn');
+            const total = allAlertsData.length;
+            const displayed = Math.min(currentPage * PAGE_SIZE, total);
+
+            if (displayed < total) {
+                btn.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = `📥 تحميل المزيد (${total - displayed} متبقية)`;
+            } else {
+                btn.style.display = 'none';
+                btn.disabled = true;
+            }
+        }
+
+        async function loadMoreAlerts() {
+            const btn = document.getElementById('loadMoreBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ جاري التحميل...';
+            await renderAlertsPage();
+            const container = document.getElementById('alertScrollContainer');
+            container.scrollTop = container.scrollHeight;
+            btn.disabled = false;
+            updateLoadMoreButton();
+        }
+
+        // ============================================================
+        // 13. دوال العرض (الخريطة والإحصائيات)
+        // ============================================================
+
+        function updateMap(fires) {
+            fireLayer.clearLayers();
+            fires.forEach(fire => {
+                const lat = fire.latitude;
+                const lng = fire.longitude;
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                const conf = (fire.confidence || '').toLowerCase();
+                let color = '#ffdd55';
+                let radius = 6;
+                if (conf === 'high' || conf === 'h') { color = '#ff3333';
+                    radius = 10; } else if (conf === 'nominal' || conf === 'n') { color = '#ffaa33';
+                    radius = 8; }
+
+                const frp = fire.frp || 0;
+                if (frp > 50) radius = 14;
+                else if (frp > 20) radius = 10;
+
+                const circle = L.circleMarker([lat, lng], {
+                    radius: radius,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 1.5,
+                    opacity: 0.9,
+                    fillOpacity: 0.7,
+                });
+
+                circle.on('click', async function() {
+                    const popupContent = `
+                                <div class="popup-content">
+                                    <div class="fire-title">🔥 حريق نشط</div>
+                                    <div class="coords">📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
+                                    <div class="loading-text">⏳ جاري جلب الموقع...</div>
+                                    <div class="time">🕒 ${getTimeAgo(fire.acq_date, fire.acq_time)}</div>
+                                    <div class="temp">🌡️ ${kelvinToCelsius(fire.brightness || fire.bright_ti4 || 0)}°C</div>
+                                    <div class="conf">⚡ ${formatConfidence(fire.confidence)}</div>
+                                    <div class="frp">🔥 FRP: ${(fire.frp || 0).toFixed(1)} ميغاواط</div>
+                                </div>
+                            `;
+                    this.bindPopup(popupContent).openPopup();
+
+                    const location = await getLocationFromCoords(lat, lng);
+                    const gmapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                    this.setPopupContent(`
+                                <div class="popup-content">
+                                    <div class="fire-title">🔥 حريق نشط</div>
+                                    <div class="coords">📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
+                                    <div class="location">${location}</div>
+                                    <div><a href="${gmapsUrl}" target="_blank" class="gmaps-link">📍 فتح في Google Maps</a></div>
+                                    <div class="time">🕒 ${getTimeAgo(fire.acq_date, fire.acq_time)}</div>
+                                    <div class="temp">🌡️ ${kelvinToCelsius(fire.brightness || fire.bright_ti4 || 0)}°C</div>
+                                    <div class="conf">⚡ ${formatConfidence(fire.confidence)}</div>
+                                    <div class="frp">🔥 FRP: ${(fire.frp || 0).toFixed(1)} ميغاواط</div>
+                                </div>
+                            `);
+                });
+
+                circle.addTo(fireLayer);
+            });
+
+            if (fires.length > 0) {
+                const group = L.featureGroup(fireLayer.getLayers());
+                map.fitBounds(group.getBounds().pad(0.15));
+            }
+        }
+
+        function updateStats(fires) {
+            const total = fires.length;
+            let high = 0,
+                nominal = 0;
+            let sumTemp = 0;
+            fires.forEach(f => {
+                const conf = (f.confidence || '').toLowerCase();
+                if (conf === 'high' || conf === 'h') high++;
+                else if (conf === 'nominal' || conf === 'n') nominal++;
+                const temp = f.brightness || f.bright_ti4 || 0;
+                if (!isNaN(temp)) sumTemp += temp;
+            });
+            document.getElementById('totalFires').textContent = total;
+            document.getElementById('highFires').textContent = high;
+            document.getElementById('nominalFires').textContent = nominal;
+            const avgC = total > 0 ? kelvinToCelsius(sumTemp / total) : '0';
+            document.getElementById('avgTemp').textContent = avgC + '°C';
+        }
+
+        // ============================================================
+        // 14. إدارة الإشعارات (Web Push VAPID)
+        // ============================================================
+
+        const SERVER_URL = 'http://localhost:3000';
+        let currentSubscription = null;
+        const notifBtn = document.getElementById('notifBtn');
+        const notifStatus = document.getElementById('notifStatus');
+
+        function isPushSupported() {
+            return 'serviceWorker' in navigator && 'PushManager' in window;
+        }
+
+        async function registerServiceWorker() {
+            if (!isPushSupported()) {
+                notifStatus.textContent = '⚠️ المتصفح لا يدعم الإشعارات';
+                return null;
+            }
+            try {
+                const registration = await navigator.serviceWorker.register('/service-worker.js', {
+                    scope: '/'
+                });
+                console.log('✅ Service Worker مسجل بنجاح');
+                return registration;
+            } catch (error) {
+                console.error('❌ فشل تسجيل Service Worker:', error);
+                notifStatus.textContent = '❌ فشل تسجيل الخدمة';
+                return null;
+            }
+        }
+
+        async function getVapidPublicKey() {
+            try {
+                const res = await fetch(`${SERVER_URL}/api/vapid-public-key`);
+                const data = await res.json();
+                return data.publicKey;
+            } catch (error) {
+                console.error('❌ فشل جلب المفتاح العمومي:', error);
+                return null;
+            }
+        }
+
+        async function subscribeUser(registration) {
+            try {
+                const publicKey = await getVapidPublicKey();
+                if (!publicKey) throw new Error('لم يتم الحصول على المفتاح العمومي');
+
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: publicKey,
+                });
+
+                const response = await fetch(`${SERVER_URL}/api/subscribe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription),
+                });
+
+                if (!response.ok) throw new Error('فشل حفظ الاشتراك في الخادم');
+
+                currentSubscription = subscription;
+                return subscription;
+            } catch (error) {
+                console.error('❌ فشل الاشتراك:', error);
+                throw error;
+            }
+        }
+
+        async function unsubscribeUser() {
+            if (!currentSubscription) return;
+            try {
+                await currentSubscription.unsubscribe();
+                await fetch(`${SERVER_URL}/api/unsubscribe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ endpoint: currentSubscription.endpoint }),
+                });
+                currentSubscription = null;
+                console.log('🗑️ تم إلغاء الاشتراك');
+            } catch (error) {
+                console.error('❌ فشل إلغاء الاشتراك:', error);
+            }
+        }
+
+        async function toggleNotifications() {
+            if (!isPushSupported()) {
+                alert('المتصفح لا يدعم الإشعارات. استخدم متصفحاً حديثاً (Chrome, Edge, Firefox).');
+                return;
+            }
+
+            const registration = await registerServiceWorker();
+            if (!registration) return;
+
+            if (currentSubscription) {
+                await unsubscribeUser();
+                updateNotifButton(false);
+                notifStatus.textContent = '❌ الإشعارات معطلة';
+                return;
+            }
+
+            let permission = Notification.permission;
+            if (permission === 'default') {
+                permission = await Notification.requestPermission();
+            }
+
+            if (permission !== 'granted') {
+                notifStatus.textContent = '⛔ تم رفض الإذن';
+                alert('يجب منح الإذن للإشعارات لتلقي التنبيهات.');
+                return;
+            }
+
+            try {
+                await subscribeUser(registration);
+                updateNotifButton(true);
+                notifStatus.textContent = '✅ الإشعارات مفعلة';
+                await sendTestNotification();
+            } catch (error) {
+                notifStatus.textContent = '❌ فشل التفعيل';
+                alert('حدث خطأ أثناء تفعيل الإشعارات: ' + error.message);
+            }
+        }
+
+        function updateNotifButton(active) {
+            if (active) {
+                notifBtn.textContent = '🔕 إلغاء الإشعارات';
+                notifBtn.classList.add('active');
+            } else {
+                notifBtn.textContent = '🔔 تفعيل الإشعارات';
+                notifBtn.classList.remove('active');
+            }
+        }
+
+        async function sendTestNotification() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/test-notification`, {
+                    method: 'POST',
+                });
+                const data = await response.json();
+                console.log('📨 نتيجة إشعار التجربة:', data);
+            } catch (error) {
+                console.error('❌ فشل إرسال الإشعار التجريبي:', error);
+            }
+        }
+
+        async function checkSubscriptionStatus() {
+            if (!isPushSupported()) {
+                notifStatus.textContent = '⚠️ غير مدعوم';
+                return;
+            }
+
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (!registration) {
+                notifStatus.textContent = '⚠️ الخدمة غير مسجلة';
+                return;
+            }
+
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+                currentSubscription = subscription;
+                updateNotifButton(true);
+                notifStatus.textContent = '✅ الإشعارات مفعلة';
+            } else {
+                updateNotifButton(false);
+                notifStatus.textContent = '❌ الإشعارات معطلة';
+            }
+        }
+
+        // ============================================================
+        // 15. بدء التشغيل
+        // ============================================================
+
+        const REFRESH_INTERVAL = 600000; // 10 دقائق
+
+        // عند تحميل الصفحة
+        document.addEventListener('DOMContentLoaded', async () => {
+            if ('serviceWorker' in navigator) {
+                await checkSubscriptionStatus();
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log('🔄 تغير الـ Service Worker');
+                    checkSubscriptionStatus();
+                });
+            }
+        });
+
+        // تشغيل الجلب الأولي والتحديث الدوري
+        fetchWildfires();
+        setInterval(fetchWildfires, REFRESH_INTERVAL);
+
+        console.log('🚀 نظام الإنذار المبكر للحرائق - النسخة النهائية مع الإشعارات');
+        console.log('📡 يعمل عبر Proxy المحلي على المنفذ 8080');
+        console.log('📍 جلب أسماء المواقع عبر Nominatim مع إعادة محاولة تلقائية');
+        console.log(`⏱️ التحديث التلقائي: ${REFRESH_INTERVAL / 60000} دقيقة`);
+        console.log('🔔 اضغط على زر "تفعيل الإشعارات" لتلقي التنبيهات على هاتفك');
+    </script>
+
+</body>
+</html>
