@@ -641,6 +641,37 @@
     ============================================================ -->
     <div id="map"></div>
 
+    <!-- زر التحكم في لوحة التنبيهات -->
+<button id="toggleAlertBtn" style="
+    position: absolute;
+    bottom: 25px;
+    right: 385px;
+    background: #ff6b35;
+    border: none;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 30px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    font-size: 13px;
+    z-index: 1000;
+    transition: 0.3s;
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+">
+    🙈 إخفاء التنبيهات
+</button>
+
+<!-- ============================================================
+ALERT PANEL
+============================================================ -->
+<div class="alert-panel" id="alertPanel">
+    <!-- ... المحتوى كما هو ... -->
+</div>
+
     <!-- ============================================================
     ALERT PANEL (مع خاصية التمرير اللانهائي)
     ============================================================ -->
@@ -1395,6 +1426,42 @@
         console.log('📍 جلب أسماء المواقع عبر Nominatim مع إعادة محاولة تلقائية');
         console.log(`⏱️ التحديث التلقائي: ${REFRESH_INTERVAL / 60000} دقيقة`);
         console.log('🔔 اضغط على زر "تفعيل الإشعارات" لتلقي التنبيهات على هاتفك');
+
+// ============================================================
+// التحكم في إظهار/إخفاء لوحة التنبيهات
+// ============================================================
+const alertPanel = document.getElementById('alertPanel');
+const toggleAlertBtn = document.getElementById('toggleAlertBtn');
+let isAlertVisible = true;
+
+toggleAlertBtn.addEventListener('click', function() {
+    if (isAlertVisible) {
+        alertPanel.style.display = 'none';
+        this.innerHTML = '👀 إظهار التنبيهات';
+        this.style.background = '#2a4055';
+        this.style.right = '25px';
+        isAlertVisible = false;
+    } else {
+        alertPanel.style.display = 'flex';
+        this.innerHTML = '🙈 إخفاء التنبيهات';
+        this.style.background = '#ff6b35';
+        this.style.right = window.innerWidth <= 768 ? 'calc(90% + 15px)' : '385px';
+        isAlertVisible = true;
+    }
+});
+
+function adjustToggleButtonPosition() {
+    const isMobile = window.innerWidth <= 768;
+    if (isAlertVisible) {
+        toggleAlertBtn.style.right = isMobile ? 'calc(90% + 15px)' : '385px';
+    } else {
+        toggleAlertBtn.style.right = isMobile ? '15px' : '25px';
+    }
+}
+
+window.addEventListener('load', adjustToggleButtonPosition);
+window.addEventListener('resize', adjustToggleButtonPosition);
+
     </script>
 
 </body>
