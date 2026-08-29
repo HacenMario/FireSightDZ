@@ -1,0 +1,18 @@
+# Secrets — never commit
+.env
+.env.*
+*.pem
+
+# Dependencies
+node_modules/
+package-lock.json.bak
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
